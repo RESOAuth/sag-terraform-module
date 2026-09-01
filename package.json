@@ -1,0 +1,25 @@
+{
+  "name": "sag-terraform-module",
+  "version": "0.2.0",
+  "description": "Terraform module for deploying Smart Access Gateway instances (RESOAuth Ltd)",
+  "license": "AGPL-3.0-only",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node scripts/check-discipline.mjs && cd test && terraform test",
+    "discipline": "node scripts/check-discipline.mjs",
+    "tf:test": "cd test && terraform test",
+    "tf:fmt": "terraform fmt -recursive -check modules test"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ssm": "^3.1122.0",
+    "wrangler": "^4.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RESOAuth/sag-terraform-module.git"
+  }
+}
