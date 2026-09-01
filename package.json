@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ssm": "^3.1122.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.127.1"
   },
   "repository": {
     "type": "git",
