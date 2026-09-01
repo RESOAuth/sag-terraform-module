@@ -1,0 +1,21 @@
+{
+  "domain": "id.example.com",
+  "sag_version": "latest",
+  "branding": { "org_name": "Example Ltd", "product_name": "Example Sign-in" },
+  "upstreams": [
+    {
+      "provider": "microsoft",
+      "domain": "example.com",
+      "client_id": "00000000-1111-2222-3333-444444444444",
+      "tenant": "example.com"
+    },
+    { "provider": "google", "client_id": "555555555555.apps.googleusercontent.com" }
+  ],
+  "cloudflare": {
+    "account_id": "0123456789abcdef0123456789abcdef",
+    "zone_id": "fedcba9876543210fedcba9876543210",
+    "state_store": "durable-object",
+    "clients_store": "kv",
+    "email": { "provider": "mailchannels", "from": "Sign in <no-reply@example.com>" }
+  }
+}

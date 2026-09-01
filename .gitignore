@@ -42,3 +42,7 @@ terraform.rc
 # Optional: ignore plan files saved before destroying Terraform configuration
 # Uncomment the line below if you want to ignore planout files.
 # planout
+# Node dependencies for the human-run scripts (wrangler, the AWS SDK).
+node_modules/
+
+.claude

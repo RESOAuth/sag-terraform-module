@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  TF_VERSION: "1.16.0"
+
+jobs:
+  discipline:
+    name: Discipline check (scripts/check-discipline.mjs)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 20
+      - run: node scripts/check-discipline.mjs
+
+  fmt:
+    name: terraform fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - run: terraform fmt -recursive -check modules test
+
+  terraform-test:
+    name: terraform test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+      - working-directory: test
+        run: terraform init
+      - working-directory: test
+        run: terraform test
+
+  tflint:
+    name: tflint (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [aws, cloudflare, sag-instance]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: terraform-linters/setup-tflint@6e87008f9dd1fe3e34e66aca6c97b4a69f72a7f4 # v4
+        with:
+          tflint_version: latest
+      - run: tflint --init
+        working-directory: modules/${{ matrix.module }}
+      - run: tflint
+        working-directory: modules/${{ matrix.module }}
+
+  checkov:
+    name: checkov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # CKV_SECRET_6 is skipped here, not with an inline checkov:skip, because
+      # it fires on modules/aws/cdn.tf's AWS-managed CloudFront origin request
+      # policy UUID (a published AWS constant), not on anything this repo
+      # wrote - see AGENTS.md, "Testing".
+      - uses: bridgecrewio/checkov-action@f967808197a8d784d3e72919f38c3ff0cda7884e # v12
+        with:
+          directory: modules
+          quiet: true
+          soft_fail: false
+          skip_check: CKV_SECRET_6

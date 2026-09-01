@@ -1,0 +1,14 @@
+{
+  "domain": "id.example.com",
+  "sag_version": "v1.4.0",
+  "aws": {
+    "region": "eu-west-2",
+    "state_store": "dynamo-db",
+    "clients_store": "s3",
+    "cdn": "cloudfront",
+    "hosted_zone_id": "Z0123456789ABCDEFGHIJ",
+    "waf": { "create": true, "rate_limit": 300 },
+    "email": { "provider": "ses", "from": "Sign in <no-reply@example.com>" },
+    "require_secrets": false
+  }
+}

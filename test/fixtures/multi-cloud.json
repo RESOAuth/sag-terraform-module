@@ -1,0 +1,20 @@
+{
+  "domain": "id.example.com",
+  "upstreams": [{ "provider": "microsoft", "client_id": "aaa" }],
+  "cloudflare": {
+    "platform_domain": "cf.id.example.com",
+    "account_id": "0123456789abcdef0123456789abcdef",
+    "zone_id": "fedcba9876543210fedcba9876543210",
+    "state_store": "durable-object",
+    "email": { "provider": "mailchannels", "from": "Sign in <no-reply@example.com>" }
+  },
+  "aws": {
+    "platform_domain": "aws-eu-west-2.id.example.com",
+    "region": "eu-west-2",
+    "state_store": "dynamo-db",
+    "cdn": "none",
+    "peer_jwks_urls": ["https://elsewhere.example.org/.well-known/jwks.json"],
+    "email": { "provider": "ses", "from": "Sign in <no-reply@example.com>" },
+    "require_secrets": false
+  }
+}

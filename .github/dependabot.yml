@@ -1,0 +1,55 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
+    directory: "/modules/aws"
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
+    directory: "/modules/cloudflare"
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
+    directory: "/modules/sag-instance"
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns:
+          - "*"
+
+  - package-ecosystem: terraform
+    directory: "/test"
+    schedule:
+      interval: weekly
+    groups:
+      terraform-providers:
+        patterns:
+          - "*"
