@@ -18,6 +18,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
+  chmodSync,
   cpSync,
   existsSync,
   mkdirSync,
@@ -33,11 +34,20 @@ import { join, resolve as resolvePath } from 'node:path';
 
 const REPO = process.env.SAG_REPO || 'RESOAuth/smart-access-gateway';
 
-// One fixed timestamp for every staged file. `archive_file`
-// carries each file's mtime into the zip entry, so without this the archive
-// hash changes on every re-stage and Terraform reports a code update it cannot
-// explain for source that did not change.
+// One fixed timestamp and one fixed mode for every staged file. `archive_file`
+// carries each file's mtime *and* its permission bits into the zip entry, so
+// without this the archive hash changes on every re-stage and Terraform reports
+// a code update it cannot explain for source that did not change.
+//
+// The mode matters as much as the mtime and is easier to miss, because it only
+// bites across machines: whoever staged the source last decides the bits, so a
+// laptop with umask 002 writes 0664 into the zip and a CI runner with umask 022
+// writes 0644, and the same commit hashes differently on each. That is a
+// permanent disagreement between a local apply and a pipeline apply rather than
+// a diff that settles, so the two would take turns rewriting the function.
 const EPOCH = new Date('1980-01-01T00:00:00Z');
+const FILE_MODE = 0o644;
+const DIR_MODE = 0o755;
 
 function fail(message) {
   process.stderr.write(`fetch-release: ${message}\n`);
@@ -173,11 +183,14 @@ function* walk(path, base) {
 
 // --- staging ----------------------------------------------------------------
 
-function normaliseTimes(path) {
+function normaliseMetadata(path) {
   const info = statSync(path);
   if (info.isDirectory()) {
-    for (const entry of readdirSync(path, { withFileTypes: true })) normaliseTimes(join(path, entry.name));
+    for (const entry of readdirSync(path, { withFileTypes: true })) normaliseMetadata(join(path, entry.name));
   }
+  // Mode before mtime: chmod updates ctime, not mtime, but doing it the other
+  // way round invites somebody to add a write here later and undo the epoch.
+  chmodSync(path, info.isDirectory() ? DIR_MODE : FILE_MODE);
   utimesSync(path, EPOCH, EPOCH);
 }
 
@@ -191,7 +204,7 @@ function stage(sourceRoot, packageDir, include) {
     }
     cpSync(from, join(packageDir, item), { recursive: true });
   }
-  normaliseTimes(packageDir);
+  normaliseMetadata(packageDir);
 }
 
 async function download(url, into) {
