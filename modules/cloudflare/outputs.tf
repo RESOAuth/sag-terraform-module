@@ -52,6 +52,26 @@ output "release" {
   }
 }
 
+output "resources" {
+  description = <<-EOT
+    What this block manages, entirely known at plan time - the same reviewable
+    summary modules/aws exposes, and what test/render.tftest.hcl asserts
+    against. The bindings are part of it because a missing binding is not a
+    start-up error: SAG reaches for `HSM` on the first signature and for
+    `SEND_EMAIL` on the first OTP, so a block missing one looks healthy right
+    up until somebody uses it.
+  EOT
+  value = {
+    worker              = local.names.worker
+    hsm_worker          = local.names.hsm_worker
+    clients_namespace   = local.use_clients ? local.names.clients_namespace : null
+    state_class         = local.use_state ? local.names.state_class : null
+    creates_state_class = local.create_state_class
+    custom_domain       = var.platform_domain
+    bindings            = { for b in local.worker_bindings : b.name => b.type if b.type != "plain_text" }
+  }
+}
+
 output "environment" {
   description = "The main Worker's plain-text variable bindings as rendered. Secrets are absent by construction: they are separate, write-only bindings set by wrangler."
   value       = local.environment

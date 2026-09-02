@@ -6,7 +6,11 @@
     "account_id": "0123456789abcdef0123456789abcdef",
     "zone_id": "fedcba9876543210fedcba9876543210",
     "state_store": "durable-object",
-    "email": { "provider": "mailchannels", "from": "Sign in <no-reply@example.com>" }
+    "email": {
+      "provider": "cloudflare",
+      "from": "Sign in <no-reply@cf.id.example.com>",
+      "destination": "codes@example.com"
+    }
   },
   "aws": {
     "platform_domain": "aws-eu-west-2.id.example.com",

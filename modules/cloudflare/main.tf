@@ -21,12 +21,37 @@ locals {
     state_binding   = "SAG_STATE"
     clients_binding = "SAG_CLIENTS"
     hsm_binding     = "HSM"
+    # SAG reads its send_email binding under whatever CLOUDFLARE_EMAIL_BINDING
+    # names, defaulting to SEND_EMAIL. Matching the default means the variable
+    # never has to be rendered.
+    email_binding = "SEND_EMAIL"
   }
 
   use_state   = var.block.state_store == "durable-object"
   use_clients = var.block.clients_store == "kv"
 
+  # Only ever true on the first apply of a block that keeps state. See the
+  # migrations argument on cloudflare_workers_script.main for why this is a
+  # flag rather than something derived.
+  create_state_class = local.use_state && !var.block.state_class_created
+
   email = var.block.email
+
+  # Cloudflare Email Sending - the outbound half of Email Service, not the
+  # inbound Email Routing the two are easily confused for - is the one provider
+  # that needs a binding rather than an API key: there is no secret to set, and
+  # without the binding SAG throws at the first OTP rather than at start-up, so
+  # a block configured for it and missing it looks healthy until somebody tries
+  # to sign in.
+  #
+  # Two things this module cannot do anything about. The sender address must
+  # belong to a domain onboarded to Email Sending, which is per domain - a
+  # subdomain is its own sending domain - and has no resource in
+  # cloudflare/cloudflare 5.x, so it stays a dashboard or REST step needing an
+  # `Email Sending: Edit` token. And sending to an address that is not a
+  # verified destination in the account needs the Workers Paid plan; verified
+  # destinations are free on every plan.
+  use_email_binding = local.email != null && local.email.provider == "cloudflare"
 
   email_secret_names = local.email == null ? [] : lookup({
     mailchannels = ["MAILCHANNELS_API_KEY"]
@@ -76,6 +101,35 @@ locals {
 
   hsm_secret_names = ["HSM_SHARED_SECRET", "SIGNING_PRIVATE_JWK"]
 
+  # Spelled out in full, rather than the `{ enabled = true }` this used to be,
+  # because `observability` is optional and *not* computed: the API answers with
+  # every nested field populated, so a config naming only `enabled` leaves
+  # `logs` and `traces` null against a state that has them set. That is a diff
+  # on every plan with nothing changed, which in turn drags every unpredictable
+  # attribute on the resource - `etag`, `handlers`, `named_handlers`,
+  # `migration_tag`, `placement`, `tail_consumers` - into the plan as "known
+  # after apply". A root configuration whose plan never comes clean is a
+  # reviewable plan that has stopped being reviewable.
+  #
+  # The values are the API's own defaults for a Worker created with
+  # observability on, so this changes nothing about the deployment; it only
+  # stops Terraform and Cloudflare describing the same thing differently.
+  observability = {
+    enabled            = true
+    head_sampling_rate = 1
+    logs = {
+      enabled            = true
+      head_sampling_rate = 1
+      invocation_logs    = true
+      persist            = true
+    }
+    traces = {
+      enabled            = false
+      head_sampling_rate = 1
+      persist            = true
+    }
+  }
+
   # Sorted, because `bindings` is a list: an unstable order would show up as a
   # diff on every plan with nothing actually changed.
   worker_bindings = concat(
@@ -99,6 +153,19 @@ locals {
       name         = local.names.clients_binding
       namespace_id = cloudflare_workers_kv_namespace.clients[0].id
     }] : [],
+    # What the binding chooses is which addresses this Worker may reach:
+    # `destination_address` pins it to exactly one, and SAG's sender sends
+    # every code to that same address when CLOUDFLARE_EMAIL_DESTINATION is
+    # set, so the two have to agree or the send is rejected. With no
+    # destination configured SAG sends to the real recipient and the binding is
+    # left unrestricted, which reaches any verified destination on any plan and
+    # any address at all only on Workers Paid.
+    local.use_email_binding ? [merge({
+      type = "send_email"
+      name = local.names.email_binding
+      },
+      local.email.destination == null ? {} : { destination_address = local.email.destination },
+    )] : [],
   )
 }
 
@@ -164,9 +231,7 @@ resource "cloudflare_workers_script" "hsm" {
   # representable here. Without this they would be deleted by the next apply.
   keep_bindings = ["secret_text"]
 
-  observability = {
-    enabled = true
-  }
+  observability = local.observability
 }
 
 resource "cloudflare_workers_script_subdomain" "hsm" {
@@ -190,14 +255,29 @@ resource "cloudflare_workers_script" "main" {
   bindings      = local.worker_bindings
   keep_bindings = ["secret_text"]
 
-  migrations = local.use_state ? {
+  # Creating the Durable Object namespace and leaving it alone afterwards are
+  # different uploads, and only the first one carries a migration.
+  #
+  # `old_tag` is how Cloudflare verifies a migration against the tag already
+  # deployed, and a migration without one is checked against the empty string.
+  # So the create-time shape below, sent a second time, is rejected with
+  # "Actor migration tag precondition failed, got tag '' when expected tag is
+  # 'v1'" - and since the field is on the script resource, that rejects the
+  # whole upload whatever the actual change was. A block deployed this way is
+  # healthy and serving and cannot be modified again, which is a worse failure
+  # than not deploying.
+  #
+  # Terraform cannot tell the two apart: nothing in a configuration says
+  # whether an apply is the first. Hence the flag, and hence its default -
+  # false is the create, so a brand-new instance works without knowing this
+  # exists, and the operator sets it true afterwards exactly as they turn
+  # aws.require_secrets back on.
+  migrations = local.create_state_class ? {
     new_tag            = "v1"
     new_sqlite_classes = [local.names.state_class]
   } : null
 
-  observability = {
-    enabled = true
-  }
+  observability = local.observability
 
   depends_on = [cloudflare_workers_script.hsm]
 }

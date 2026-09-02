@@ -190,6 +190,13 @@ variable "cloudflare" {
     The Cloudflare Workers block. Null deploys nothing on Cloudflare, and the
     submodule is not instantiated at all, so a root configuration carrying no
     Cloudflare credentials is unaffected by its presence in this module.
+
+    `state_class_created` is a two-phase apply, like `aws.require_secrets` but
+    the other way round: false creates the Durable Object namespace, true
+    leaves it alone. Set it true once the first apply has succeeded. With it
+    left false, Cloudflare rejects every later upload of the main Worker,
+    because the migration carries no `old_tag` to verify against the `v1`
+    already deployed.
   EOT
   type = object({
     platform_domain = optional(string)
@@ -197,6 +204,13 @@ variable "cloudflare" {
     zone_id         = string
     state_store     = optional(string, "none")
     clients_store   = optional(string, "none")
+    # The "already created" half of a two-phase apply, the same shape
+    # aws.require_secrets has and for the same kind of reason: creating the
+    # Durable Object namespace and leaving it alone afterwards are different
+    # requests, and nothing in a configuration can tell Terraform which apply
+    # it is on. Leave it false for the first apply of a state_store =
+    # "durable-object" block, then set it true and leave it true.
+    state_class_created = optional(bool, false)
     email = optional(object({
       provider           = string
       from               = optional(string)

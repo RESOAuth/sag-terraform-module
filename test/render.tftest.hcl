@@ -207,6 +207,28 @@ run "single_cloudflare" {
     error_message = "unexpected Cloudflare secret set."
   }
 
+  # No `state_class_created` in the fixture, so this is a first apply and the
+  # Durable Object migration is present.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.creates_state_class == true,
+      output.cloudflare_block.resources.state_class == "StateGuard",
+    ])
+    error_message = "a first apply of a durable-object block must carry the migration."
+  }
+
+  # mailchannels sends over its own HTTP API with an API key, so this block
+  # gets no send_email binding - only the provider that needs one gets one.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.bindings["HSM"] == "service",
+      output.cloudflare_block.resources.bindings["SAG_STATE"] == "durable_object_namespace",
+      output.cloudflare_block.resources.bindings["SAG_CLIENTS"] == "kv_namespace",
+      !contains(keys(output.cloudflare_block.resources.bindings), "SEND_EMAIL"),
+    ])
+    error_message = "unexpected Cloudflare binding set: ${jsonencode(output.cloudflare_block.resources.bindings)}"
+  }
+
   # Not a single `aws:ssm:` pointer on this platform: Workers secrets are
   # write-only at the platform level, so there is nothing to point at.
   assert {
@@ -217,6 +239,42 @@ run "single_cloudflare" {
   assert {
     condition     = output.aws_block == null
     error_message = "a Cloudflare-only instance must not instantiate the AWS submodule at all."
+  }
+}
+
+# --- the second and every later apply of a block that keeps state -----------
+#
+# `old_tag` is how Cloudflare verifies a migration against the tag already
+# deployed, so re-sending the create-time migration is rejected and takes the
+# whole upload with it, whatever else changed. The flag is what stops a
+# deployed block becoming unmodifiable.
+
+run "cloudflare_state_class_already_created" {
+  command = plan
+
+  variables {
+    instance = {
+      domain = "id.example.com"
+      cloudflare = merge(jsondecode(file("fixtures/single-cloudflare.json")).cloudflare, {
+        state_class_created = true
+      })
+    }
+  }
+
+  assert {
+    condition     = output.cloudflare_block.resources.creates_state_class == false
+    error_message = "with the namespace already created, no migration may be sent."
+  }
+
+  # The binding stays: the flag governs the migration, not the namespace the
+  # Worker talks to.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.state_class == "StateGuard",
+      output.cloudflare_block.resources.bindings["SAG_STATE"] == "durable_object_namespace",
+      output.cloudflare_block.environment["STATE_STORE_BACKEND"] == "cf-durable-object",
+    ])
+    error_message = "the flag must change only the migration, never the state binding."
   }
 }
 
@@ -265,6 +323,31 @@ run "multi_cloud_mesh" {
   assert {
     condition     = output.slugs["aws"] != output.slugs["cloudflare"]
     error_message = "two blocks on different hostnames must get different slugs."
+  }
+
+  # Each block sends through its own platform's service: SES on Lambda, where
+  # the execution role supplies the credentials, and Email Routing on Workers,
+  # where there is no role to supply anything. Email Routing is the one
+  # provider that needs a binding rather than an API key, so it must add
+  # SEND_EMAIL and must not add a secret name.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.bindings["SEND_EMAIL"] == "send_email",
+      output.cloudflare_block.environment["EMAIL_PROVIDER"] == "cloudflare",
+      output.cloudflare_block.environment["CLOUDFLARE_EMAIL_DESTINATION"] == "codes@example.com",
+      output.aws_block.environment["EMAIL_PROVIDER"] == "ses",
+    ])
+    error_message = "the Cloudflare block should send through Email Routing, bound as SEND_EMAIL."
+  }
+
+  assert {
+    condition = output.cloudflare_block.secret_names["sag-${output.slugs["cloudflare"]}"] == tolist([
+      "HSM_SHARED_SECRET",
+      "SAG_SECRET",
+      "SUBJECT_SALT",
+      "UPSTREAM_MICROSOFT_COMMON_CLIENT_SECRET",
+    ])
+    error_message = "Email Routing needs no API key, so it must add no secret: got ${jsonencode(output.cloudflare_block.secret_names["sag-${output.slugs["cloudflare"]}"])}"
   }
 
   # cdn = "none" on this block: no distribution, no certificate, no DNS and no
