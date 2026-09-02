@@ -124,10 +124,19 @@ finished.
   `cloudflare` is the only one: SAG's `src/email/cloudflare.js` reads the
   `send_email` binding named by `CLOUDFLARE_EMAIL_BINDING`, defaulting to
   `SEND_EMAIL`, and throws at the first OTP rather than at start-up, so a
-  block configured for Email Routing without the binding plans clean, applies
-  clean and looks healthy. `local.use_email_binding` in
-  `modules/cloudflare/main.tf` adds it, and the `resources.bindings` output
-  exists so `test/render.tftest.hcl` can assert on it.
+  block configured for it without the binding plans clean, applies clean and
+  looks healthy. `local.use_email_binding` in `modules/cloudflare/main.tf`
+  adds it, and the `resources.bindings` output exists so
+  `test/render.tftest.hcl` can assert on it.
+- The provider is **Email Sending**, the outbound half of Cloudflare Email
+  Service - not Email Routing, which is inbound and whose verified-destination
+  list is not what governs outbound delivery. Do not describe it as Email
+  Routing, and do not reach for a routing address when diagnosing a send. Two
+  parts of it are outside this module by necessity: the sender's domain has to
+  be onboarded to Email Sending, per domain and with a subdomain counting as
+  its own, and `cloudflare/cloudflare` 5.x has no resource for that; and
+  reaching an address that is not a verified destination needs Workers Paid.
+  Both belong in an instance's own notes, not here.
 - **No `lifecycle.ignore_changes` anywhere on the AWS side.** The
   merge-vs-replace hazard that would force one does not arise when the
   thing Terraform writes was never secret.

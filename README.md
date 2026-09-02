@@ -177,7 +177,16 @@ supplies the credentials through the environment; `ses` on Workers has no role
 to supply anything and needs `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
 as Workers secrets, which this module does not model and therefore does not
 report. The platform-native pairing is `ses` on AWS and `cloudflare` - Email
-Routing, bound as `SEND_EMAIL` - on Cloudflare.
+Sending, the outbound half of Cloudflare Email Service, bound as `SEND_EMAIL`
+- on Cloudflare.
+
+Email Sending needs two things this module cannot provision. The sender's
+domain must be onboarded to it, which is per domain and counts a subdomain as
+its own, and `cloudflare/cloudflare` 5.x has no resource for that - so it is a
+dashboard step, or a REST call with an `Email Sending: Edit` token. And
+reaching a recipient who is not a verified destination in the account needs
+the Workers Paid plan. Until the domain is onboarded the binding exists, the
+block is healthy, and the first OTP fails.
 
 ## Adopting an instance that already exists
 

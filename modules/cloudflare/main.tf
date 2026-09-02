@@ -32,10 +32,20 @@ locals {
 
   email = var.block.email
 
-  # Cloudflare Email Routing is the one provider that needs a binding rather
-  # than an API key: there is no secret to set, and without the binding SAG
-  # throws at the first OTP rather than at start-up, so a block configured for
-  # it and missing it looks healthy until somebody tries to sign in.
+  # Cloudflare Email Sending - the outbound half of Email Service, not the
+  # inbound Email Routing the two are easily confused for - is the one provider
+  # that needs a binding rather than an API key: there is no secret to set, and
+  # without the binding SAG throws at the first OTP rather than at start-up, so
+  # a block configured for it and missing it looks healthy until somebody tries
+  # to sign in.
+  #
+  # Two things this module cannot do anything about. The sender address must
+  # belong to a domain onboarded to Email Sending, which is per domain - a
+  # subdomain is its own sending domain - and has no resource in
+  # cloudflare/cloudflare 5.x, so it stays a dashboard or REST step needing an
+  # `Email Sending: Edit` token. And sending to an address that is not a
+  # verified destination in the account needs the Workers Paid plan; verified
+  # destinations are free on every plan.
   use_email_binding = local.email != null && local.email.provider == "cloudflare"
 
   email_secret_names = local.email == null ? [] : lookup({
@@ -109,14 +119,13 @@ locals {
       name         = local.names.clients_binding
       namespace_id = cloudflare_workers_kv_namespace.clients[0].id
     }] : [],
-    # Email Routing will only deliver to an address verified as a destination
-    # in the account, whatever this binding says - that restriction is
-    # Cloudflare's. What the binding chooses is which of them this Worker may
-    # reach: `destination_address` pins it to exactly one, and SAG's sender
-    # sends every code to that same address when CLOUDFLARE_EMAIL_DESTINATION
-    # is set, so the two have to agree or the send is rejected. With no
-    # destination configured SAG sends to the real recipient, and the binding
-    # is left unrestricted so any verified destination is reachable.
+    # What the binding chooses is which addresses this Worker may reach:
+    # `destination_address` pins it to exactly one, and SAG's sender sends
+    # every code to that same address when CLOUDFLARE_EMAIL_DESTINATION is
+    # set, so the two have to agree or the send is rejected. With no
+    # destination configured SAG sends to the real recipient and the binding is
+    # left unrestricted, which reaches any verified destination on any plan and
+    # any address at all only on Workers Paid.
     local.use_email_binding ? [merge({
       type = "send_email"
       name = local.names.email_binding
