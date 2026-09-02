@@ -62,12 +62,13 @@ output "resources" {
     up until somebody uses it.
   EOT
   value = {
-    worker            = local.names.worker
-    hsm_worker        = local.names.hsm_worker
-    clients_namespace = local.use_clients ? local.names.clients_namespace : null
-    state_class       = local.use_state ? local.names.state_class : null
-    custom_domain     = var.platform_domain
-    bindings          = { for b in local.worker_bindings : b.name => b.type if b.type != "plain_text" }
+    worker              = local.names.worker
+    hsm_worker          = local.names.hsm_worker
+    clients_namespace   = local.use_clients ? local.names.clients_namespace : null
+    state_class         = local.use_state ? local.names.state_class : null
+    creates_state_class = local.create_state_class
+    custom_domain       = var.platform_domain
+    bindings            = { for b in local.worker_bindings : b.name => b.type if b.type != "plain_text" }
   }
 }
 

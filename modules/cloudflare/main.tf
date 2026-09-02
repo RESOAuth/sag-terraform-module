@@ -30,6 +30,11 @@ locals {
   use_state   = var.block.state_store == "durable-object"
   use_clients = var.block.clients_store == "kv"
 
+  # Only ever true on the first apply of a block that keeps state. See the
+  # migrations argument on cloudflare_workers_script.main for why this is a
+  # flag rather than something derived.
+  create_state_class = local.use_state && !var.block.state_class_created
+
   email = var.block.email
 
   # Cloudflare Email Sending - the outbound half of Email Service, not the
@@ -250,7 +255,24 @@ resource "cloudflare_workers_script" "main" {
   bindings      = local.worker_bindings
   keep_bindings = ["secret_text"]
 
-  migrations = local.use_state ? {
+  # Creating the Durable Object namespace and leaving it alone afterwards are
+  # different uploads, and only the first one carries a migration.
+  #
+  # `old_tag` is how Cloudflare verifies a migration against the tag already
+  # deployed, and a migration without one is checked against the empty string.
+  # So the create-time shape below, sent a second time, is rejected with
+  # "Actor migration tag precondition failed, got tag '' when expected tag is
+  # 'v1'" - and since the field is on the script resource, that rejects the
+  # whole upload whatever the actual change was. A block deployed this way is
+  # healthy and serving and cannot be modified again, which is a worse failure
+  # than not deploying.
+  #
+  # Terraform cannot tell the two apart: nothing in a configuration says
+  # whether an apply is the first. Hence the flag, and hence its default -
+  # false is the create, so a brand-new instance works without knowing this
+  # exists, and the operator sets it true afterwards exactly as they turn
+  # aws.require_secrets back on.
+  migrations = local.create_state_class ? {
     new_tag            = "v1"
     new_sqlite_classes = [local.names.state_class]
   } : null

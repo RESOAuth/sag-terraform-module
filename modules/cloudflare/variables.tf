@@ -17,11 +17,12 @@ variable "peer_jwks_urls" {
 variable "block" {
   description = "The `cloudflare` object from modules/sag-instance's contract, unchanged."
   type = object({
-    platform_domain = optional(string)
-    account_id      = string
-    zone_id         = string
-    state_store     = optional(string, "none")
-    clients_store   = optional(string, "none")
+    platform_domain     = optional(string)
+    account_id          = string
+    zone_id             = string
+    state_store         = optional(string, "none")
+    clients_store       = optional(string, "none")
+    state_class_created = optional(bool, false)
     email = optional(object({
       provider           = string
       from               = optional(string)

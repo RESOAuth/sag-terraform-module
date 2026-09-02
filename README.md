@@ -65,6 +65,15 @@ scripts/sag-secrets.mjs set --instance id.example.com --region eu-west-2 \
 terraform apply
 ```
 
+A Cloudflare block that keeps state has a second, similar two-phase step, for
+a reason worth knowing before it bites: `state_class_created` is false for the
+first apply, which creates the Durable Object namespace, and true for every
+apply after it. Leave it false and Cloudflare rejects the next upload of the
+Worker - the migration carries no `old_tag` to verify against the one already
+deployed - and because that field is on the script resource, the rejection
+takes the whole upload with it whatever the real change was. The block stays
+healthy and serving and stops being modifiable.
+
 With the gate on, a plan that is missing a secret fails and names it:
 
 ```

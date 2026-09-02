@@ -128,6 +128,19 @@ finished.
   looks healthy. `local.use_email_binding` in `modules/cloudflare/main.tf`
   adds it, and the `resources.bindings` output exists so
   `test/render.tftest.hcl` can assert on it.
+- A `state_store = "durable-object"` block has a **two-phase apply**, and it
+  is not optional. `cloudflare_workers_script.migrations` is how the Durable
+  Object namespace gets created, and `old_tag` is how Cloudflare verifies a
+  migration against the tag already deployed. Re-sending the create-time
+  migration is therefore rejected - "Actor migration tag precondition failed,
+  got tag '' when expected tag is 'v1'" - and because the field lives on the
+  script resource, that rejects the entire upload whatever the real change
+  was. A block deployed with no way to switch this off is healthy, serving,
+  and permanently unmodifiable, which is worse than one that failed to
+  deploy. `cloudflare.state_class_created` is the switch: false is the create,
+  true is every apply after it. Nothing in a configuration can tell Terraform
+  which apply it is on, so this cannot be derived, and the same is true of
+  `aws.require_secrets`.
 - The provider is **Email Sending**, the outbound half of Cloudflare Email
   Service - not Email Routing, which is inbound and whose verified-destination
   list is not what governs outbound delivery. Do not describe it as Email
