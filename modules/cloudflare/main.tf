@@ -21,12 +21,22 @@ locals {
     state_binding   = "SAG_STATE"
     clients_binding = "SAG_CLIENTS"
     hsm_binding     = "HSM"
+    # SAG reads its send_email binding under whatever CLOUDFLARE_EMAIL_BINDING
+    # names, defaulting to SEND_EMAIL. Matching the default means the variable
+    # never has to be rendered.
+    email_binding = "SEND_EMAIL"
   }
 
   use_state   = var.block.state_store == "durable-object"
   use_clients = var.block.clients_store == "kv"
 
   email = var.block.email
+
+  # Cloudflare Email Routing is the one provider that needs a binding rather
+  # than an API key: there is no secret to set, and without the binding SAG
+  # throws at the first OTP rather than at start-up, so a block configured for
+  # it and missing it looks healthy until somebody tries to sign in.
+  use_email_binding = local.email != null && local.email.provider == "cloudflare"
 
   email_secret_names = local.email == null ? [] : lookup({
     mailchannels = ["MAILCHANNELS_API_KEY"]
@@ -99,6 +109,20 @@ locals {
       name         = local.names.clients_binding
       namespace_id = cloudflare_workers_kv_namespace.clients[0].id
     }] : [],
+    # Email Routing will only deliver to an address verified as a destination
+    # in the account, whatever this binding says - that restriction is
+    # Cloudflare's. What the binding chooses is which of them this Worker may
+    # reach: `destination_address` pins it to exactly one, and SAG's sender
+    # sends every code to that same address when CLOUDFLARE_EMAIL_DESTINATION
+    # is set, so the two have to agree or the send is rejected. With no
+    # destination configured SAG sends to the real recipient, and the binding
+    # is left unrestricted so any verified destination is reachable.
+    local.use_email_binding ? [merge({
+      type = "send_email"
+      name = local.names.email_binding
+      },
+      local.email.destination == null ? {} : { destination_address = local.email.destination },
+    )] : [],
   )
 }
 

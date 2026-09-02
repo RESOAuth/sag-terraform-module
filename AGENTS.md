@@ -119,6 +119,15 @@ finished.
   the rest of the `bindings` list, which is only safe because
   `keep_bindings = ["secret_text"]` stops an apply deleting every secret a
   person set - without it, an ordinary successful run would wipe them.
+- An email provider that needs a **binding** rather than a secret needs the
+  binding written here, because nothing else will notice it is missing.
+  `cloudflare` is the only one: SAG's `src/email/cloudflare.js` reads the
+  `send_email` binding named by `CLOUDFLARE_EMAIL_BINDING`, defaulting to
+  `SEND_EMAIL`, and throws at the first OTP rather than at start-up, so a
+  block configured for Email Routing without the binding plans clean, applies
+  clean and looks healthy. `local.use_email_binding` in
+  `modules/cloudflare/main.tf` adds it, and the `resources.bindings` output
+  exists so `test/render.tftest.hcl` can assert on it.
 - **No `lifecycle.ignore_changes` anywhere on the AWS side.** The
   merge-vs-replace hazard that would force one does not arise when the
   thing Terraform writes was never secret.

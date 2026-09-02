@@ -144,11 +144,40 @@ provider credentials - not one configuration with a flag, because provider
 credentials are wired in at parse time rather than chosen per invocation.
 
 A Cloudflare-only pipeline sets `cloudflare = {...}` and leaves `aws` null;
-the AWS submodule is then never instantiated, so its provider is never
-authenticated and its absent credentials are not an error. Adding a platform
-later needs no coordination: a second pipeline, in its own credential scope,
-starts applying its own root configuration against the same instance data,
-with each block's `peer_jwks_urls` naming the other.
+the AWS submodule is then never instantiated, so no AWS resource is created.
+Terraform still requires the root configuration to supply a configuration for
+every provider a child module declares, and the AWS provider - unlike the
+Cloudflare one - validates its credentials with an `sts:GetCallerIdentity`
+call the moment it is configured, whether or not anything in the graph needs
+it. So a Cloudflare-only root configuration gives its unused `aws` and
+`aws.us_east_1` providers static placeholder credentials and
+`skip_credentials_validation`, rather than a real AWS credential it has no
+business holding:
+
+```hcl
+provider "aws" {
+  region                      = "eu-west-2"
+  access_key                  = "unused-by-this-root-configuration"
+  secret_key                  = "unused-by-this-root-configuration"
+  skip_credentials_validation = true
+  skip_requesting_account_id  = true
+  skip_metadata_api_check     = true
+}
+```
+
+Adding a platform later needs no coordination beyond that: a second pipeline,
+in its own credential scope, starts applying its own root configuration
+against the same instance data, with each block's `peer_jwks_urls` naming the
+other.
+
+Email is worth deciding per block rather than per instance, because a sender
+that works on one platform may drag the other platform's credentials into the
+block. `ses` on Lambda needs nothing but a region, since the execution role
+supplies the credentials through the environment; `ses` on Workers has no role
+to supply anything and needs `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+as Workers secrets, which this module does not model and therefore does not
+report. The platform-native pairing is `ses` on AWS and `cloudflare` - Email
+Routing, bound as `SEND_EMAIL` - on Cloudflare.
 
 ## Adopting an instance that already exists
 

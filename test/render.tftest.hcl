@@ -207,6 +207,18 @@ run "single_cloudflare" {
     error_message = "unexpected Cloudflare secret set."
   }
 
+  # mailchannels sends over its own HTTP API with an API key, so this block
+  # gets no send_email binding - only the provider that needs one gets one.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.bindings["HSM"] == "service",
+      output.cloudflare_block.resources.bindings["SAG_STATE"] == "durable_object_namespace",
+      output.cloudflare_block.resources.bindings["SAG_CLIENTS"] == "kv_namespace",
+      !contains(keys(output.cloudflare_block.resources.bindings), "SEND_EMAIL"),
+    ])
+    error_message = "unexpected Cloudflare binding set: ${jsonencode(output.cloudflare_block.resources.bindings)}"
+  }
+
   # Not a single `aws:ssm:` pointer on this platform: Workers secrets are
   # write-only at the platform level, so there is nothing to point at.
   assert {
@@ -265,6 +277,31 @@ run "multi_cloud_mesh" {
   assert {
     condition     = output.slugs["aws"] != output.slugs["cloudflare"]
     error_message = "two blocks on different hostnames must get different slugs."
+  }
+
+  # Each block sends through its own platform's service: SES on Lambda, where
+  # the execution role supplies the credentials, and Email Routing on Workers,
+  # where there is no role to supply anything. Email Routing is the one
+  # provider that needs a binding rather than an API key, so it must add
+  # SEND_EMAIL and must not add a secret name.
+  assert {
+    condition = alltrue([
+      output.cloudflare_block.resources.bindings["SEND_EMAIL"] == "send_email",
+      output.cloudflare_block.environment["EMAIL_PROVIDER"] == "cloudflare",
+      output.cloudflare_block.environment["CLOUDFLARE_EMAIL_DESTINATION"] == "codes@example.com",
+      output.aws_block.environment["EMAIL_PROVIDER"] == "ses",
+    ])
+    error_message = "the Cloudflare block should send through Email Routing, bound as SEND_EMAIL."
+  }
+
+  assert {
+    condition = output.cloudflare_block.secret_names["sag-${output.slugs["cloudflare"]}"] == tolist([
+      "HSM_SHARED_SECRET",
+      "SAG_SECRET",
+      "SUBJECT_SALT",
+      "UPSTREAM_MICROSOFT_COMMON_CLIENT_SECRET",
+    ])
+    error_message = "Email Routing needs no API key, so it must add no secret: got ${jsonencode(output.cloudflare_block.secret_names["sag-${output.slugs["cloudflare"]}"])}"
   }
 
   # cdn = "none" on this block: no distribution, no certificate, no DNS and no
