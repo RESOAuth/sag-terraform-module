@@ -96,6 +96,35 @@ locals {
 
   hsm_secret_names = ["HSM_SHARED_SECRET", "SIGNING_PRIVATE_JWK"]
 
+  # Spelled out in full, rather than the `{ enabled = true }` this used to be,
+  # because `observability` is optional and *not* computed: the API answers with
+  # every nested field populated, so a config naming only `enabled` leaves
+  # `logs` and `traces` null against a state that has them set. That is a diff
+  # on every plan with nothing changed, which in turn drags every unpredictable
+  # attribute on the resource - `etag`, `handlers`, `named_handlers`,
+  # `migration_tag`, `placement`, `tail_consumers` - into the plan as "known
+  # after apply". A root configuration whose plan never comes clean is a
+  # reviewable plan that has stopped being reviewable.
+  #
+  # The values are the API's own defaults for a Worker created with
+  # observability on, so this changes nothing about the deployment; it only
+  # stops Terraform and Cloudflare describing the same thing differently.
+  observability = {
+    enabled            = true
+    head_sampling_rate = 1
+    logs = {
+      enabled            = true
+      head_sampling_rate = 1
+      invocation_logs    = true
+      persist            = true
+    }
+    traces = {
+      enabled            = false
+      head_sampling_rate = 1
+      persist            = true
+    }
+  }
+
   # Sorted, because `bindings` is a list: an unstable order would show up as a
   # diff on every plan with nothing actually changed.
   worker_bindings = concat(
@@ -197,9 +226,7 @@ resource "cloudflare_workers_script" "hsm" {
   # representable here. Without this they would be deleted by the next apply.
   keep_bindings = ["secret_text"]
 
-  observability = {
-    enabled = true
-  }
+  observability = local.observability
 }
 
 resource "cloudflare_workers_script_subdomain" "hsm" {
@@ -228,9 +255,7 @@ resource "cloudflare_workers_script" "main" {
     new_sqlite_classes = [local.names.state_class]
   } : null
 
-  observability = {
-    enabled = true
-  }
+  observability = local.observability
 
   depends_on = [cloudflare_workers_script.hsm]
 }
