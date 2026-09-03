@@ -240,6 +240,32 @@ run "single_cloudflare" {
     condition     = output.aws_block == null
     error_message = "a Cloudflare-only instance must not instantiate the AWS submodule at all."
   }
+
+  assert {
+    condition     = output.cloudflare_block.resources.invocation_logs == false
+    error_message = "invocation logs must default off so request URLs and headers are not persisted."
+  }
+}
+
+run "single_cloudflare_with_invocation_logs" {
+  command = plan
+
+  variables {
+    instance = merge(
+      jsondecode(file("fixtures/single-cloudflare.json")),
+      {
+        cloudflare = merge(
+          jsondecode(file("fixtures/single-cloudflare.json")).cloudflare,
+          { invocation_logs = true },
+        )
+      },
+    )
+  }
+
+  assert {
+    condition     = output.cloudflare_block.resources.invocation_logs == true
+    error_message = "cloudflare.invocation_logs must allow an operator to opt into automatic request capture."
+  }
 }
 
 # --- the second and every later apply of a block that keeps state -----------

@@ -22,6 +22,7 @@ variable "block" {
     zone_id             = string
     state_store         = optional(string, "none")
     clients_store       = optional(string, "none")
+    invocation_logs     = optional(bool, false)
     state_class_created = optional(bool, false)
     email = optional(object({
       provider           = string

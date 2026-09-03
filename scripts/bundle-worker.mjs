@@ -53,8 +53,10 @@ if (!existsSync(entryPath)) fail(`the resolved source has no ${entry}`);
 
 // Beside the staged source, so it is cleaned up with the release cache and
 // survives between the plan that computes it and the apply that reads it.
-const outDir = join(sourceDir, '..', 'bundles', basename(entry, '.js'));
-const configPath = join(sourceDir, '..', `wrangler.bundle.${basename(entry, '.js')}.toml`);
+const bundleName = basename(entry, '.js');
+const outDir = join(sourceDir, '..', 'bundles', bundleName);
+const configPath = join(sourceDir, '..', `wrangler.bundle.${bundleName}.toml`);
+const npmCache = join(sourceDir, '..', 'npm-cache', bundleName);
 
 rmSync(outDir, { recursive: true, force: true });
 mkdirSync(outDir, { recursive: true });
@@ -82,7 +84,15 @@ try {
     {
       cwd: sourceDir,
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...process.env, WRANGLER_SEND_METRICS: 'false', CI: '1' },
+      // Terraform evaluates the main and HSM data sources concurrently. npx
+      // cannot safely populate one _npx directory from both processes, so
+      // isolate their caches while retaining each one across later plans.
+      env: {
+        ...process.env,
+        ...(process.env.SAG_WRANGLER ? {} : { npm_config_cache: npmCache }),
+        WRANGLER_SEND_METRICS: 'false',
+        CI: '1',
+      },
       maxBuffer: 64 * 1024 * 1024,
     },
   );
