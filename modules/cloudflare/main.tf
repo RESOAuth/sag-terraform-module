@@ -111,16 +111,16 @@ locals {
   # after apply". A root configuration whose plan never comes clean is a
   # reviewable plan that has stopped being reviewable.
   #
-  # The values are the API's own defaults for a Worker created with
-  # observability on, so this changes nothing about the deployment; it only
-  # stops Terraform and Cloudflare describing the same thing differently.
+  # Invocation logs include complete request URLs and headers. OAuth query
+  # parameters and session cookies must not be persisted, so keep application
+  # logs available while disabling the automatic request capture.
   observability = {
     enabled            = true
     head_sampling_rate = 1
     logs = {
       enabled            = true
       head_sampling_rate = 1
-      invocation_logs    = true
+      invocation_logs    = false
       persist            = true
     }
     traces = {
