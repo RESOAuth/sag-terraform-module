@@ -69,6 +69,7 @@ output "resources" {
     creates_state_class = local.create_state_class
     custom_domain       = var.platform_domain
     bindings            = { for b in local.worker_bindings : b.name => b.type if b.type != "plain_text" }
+    invocation_logs     = var.block.invocation_logs
   }
 }
 

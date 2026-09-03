@@ -204,6 +204,7 @@ variable "cloudflare" {
     zone_id         = string
     state_store     = optional(string, "none")
     clients_store   = optional(string, "none")
+    invocation_logs = optional(bool, false)
     # The "already created" half of a two-phase apply, the same shape
     # aws.require_secrets has and for the same kind of reason: creating the
     # Durable Object namespace and leaving it alone afterwards are different

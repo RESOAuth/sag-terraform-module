@@ -74,6 +74,11 @@ deployed - and because that field is on the script resource, the rejection
 takes the whole upload with it whatever the real change was. The block stays
 healthy and serving and stops being modifiable.
 
+Cloudflare invocation logs include complete request URLs and headers, so they
+default off to avoid persisting OAuth parameters and session cookies. Set
+`cloudflare.invocation_logs` to `true` only when that automatic request capture
+is explicitly required; application logs remain enabled either way.
+
 With the gate on, a plan that is missing a secret fails and names it:
 
 ```

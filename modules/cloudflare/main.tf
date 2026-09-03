@@ -111,16 +111,16 @@ locals {
   # after apply". A root configuration whose plan never comes clean is a
   # reviewable plan that has stopped being reviewable.
   #
-  # Invocation logs include complete request URLs and headers. OAuth query
-  # parameters and session cookies must not be persisted, so keep application
-  # logs available while disabling the automatic request capture.
+  # Invocation logs include complete request URLs and headers. They are off by
+  # default so OAuth query parameters and session cookies are not persisted;
+  # an operator can opt in explicitly while keeping application logs available.
   observability = {
     enabled            = true
     head_sampling_rate = 1
     logs = {
       enabled            = true
       head_sampling_rate = 1
-      invocation_logs    = false
+      invocation_logs    = var.block.invocation_logs
       persist            = true
     }
     traces = {
