@@ -213,9 +213,9 @@ standing limitation.
 
 ## Save the plaintext when it is first generated
 
-`sag-secrets.mjs` prints each generated value once and cannot store it for
-you. Put it in whatever vault you already trust, and treat that as the one
-deliberate exception to "no keys stored unnecessarily".
+`npm run secrets` (`sag-secrets.mjs`) prints each generated value once and
+cannot store it for you. Put it in whatever vault you already trust, and
+treat that as the one deliberate exception to "no keys stored unnecessarily".
 
 `SAG_SECRET` and `SUBJECT_SALT` must be **identical** across every block of
 an instance, and neither can be read back off a platform. Adding a second
