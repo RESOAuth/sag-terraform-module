@@ -9,6 +9,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "secrets": "node scripts/sag-secrets.mjs",
     "test": "node scripts/check-discipline.mjs && cd test && terraform test",
     "discipline": "node scripts/check-discipline.mjs",
     "tf:test": "cd test && terraform test",
