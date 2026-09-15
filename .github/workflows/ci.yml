@@ -56,7 +56,7 @@ jobs:
         module: [aws, cloudflare, sag-instance]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+      - uses: terraform-linters/setup-tflint@1cf010d3c7aef302051ccdb68c14c5dc2efa34ef # v6.3.1
         with:
           tflint_version: latest
       - run: tflint --init
@@ -73,7 +73,7 @@ jobs:
       # it fires on modules/aws/cdn.tf's AWS-managed CloudFront origin request
       # policy UUID (a published AWS constant), not on anything this repo
       # wrote - see AGENTS.md, "Testing".
-      - uses: bridgecrewio/checkov-action@f967808197a8d784d3e72919f38c3ff0cda7884e # v12
+      - uses: bridgecrewio/checkov-action@a8664e3a0549367977f0cda990a34311835c87c0 # v12
         with:
           directory: modules
           quiet: true
