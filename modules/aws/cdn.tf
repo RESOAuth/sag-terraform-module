@@ -25,6 +25,7 @@ locals {
 
   platform_zone_id = (
     !local.cdn_enabled ? null :
+    var.block.create_hosted_zone ? aws_route53_zone.platform[0].zone_id :
     var.block.hosted_zone_id != null ? var.block.hosted_zone_id :
     data.aws_route53_zone.platform[0].zone_id
   )
@@ -76,7 +77,7 @@ resource "random_id" "cdn_origin_secret" {
 }
 
 data "aws_route53_zone" "platform" {
-  count = local.cdn_enabled && var.block.hosted_zone_id == null ? 1 : 0
+  count = local.cdn_enabled && !var.block.create_hosted_zone && var.block.hosted_zone_id == null ? 1 : 0
 
   # Exact zone name. Defaults to the block's own hostname, which is right when
   # the hostname is itself a delegated zone; set `hosted_zone_name` when the
@@ -84,6 +85,15 @@ data "aws_route53_zone" "platform" {
   # lookup entirely.
   name         = coalesce(var.block.hosted_zone_name, var.platform_domain)
   private_zone = false
+}
+
+resource "aws_route53_zone" "platform" {
+  # checkov:skip=CKV2_AWS_38:DNSSEC needs a separate us-east-1 signing key and coordinated DS creation and removal at the parent DNS provider. This module does not control that parent, so enabling signing without an agreed DS lifecycle would not establish a chain of trust.
+  # checkov:skip=CKV2_AWS_39:Query logging records client DNS queries and needs a dedicated log group and delivery permissions. Zone delegation does not require those logs; their retention and access belong in an explicit deployment logging policy.
+  count = var.block.create_hosted_zone ? 1 : 0
+
+  name = var.platform_domain
+  tags = local.tags
 }
 
 # --- ACM --------------------------------------------------------------------

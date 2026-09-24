@@ -121,6 +121,7 @@ run "single_aws" {
     condition = jsonencode(output.aws_block.resources) == jsonencode({
       cdn                 = true
       certificate_domains = ["id.example.com"]
+      hosted_zone         = null
       clients_bucket      = "sag-${output.slugs["aws"]}-clients"
       dns_records         = ["id.example.com A", "id.example.com AAAA"]
       function            = "sag-${output.slugs["aws"]}"

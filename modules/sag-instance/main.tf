@@ -229,12 +229,12 @@ module "aws" {
   slug            = local.aws_slug
   identity        = local.identity
   platform_domain = local.aws_platform_domain
-  # Every ACM subject and CloudFront alias this block serves: its own hostname
-  # first, then the central domain when that is a different name. DNS for the
-  # central domain is deliberately not created - which platform answers on it
-  # stays the operator's decision - so its ACM validation record only appears
-  # if `extra_hosted_zone_ids` says where it lives.
-  hostnames      = distinct(compact([local.aws_platform_domain, var.domain]))
+  # A shared issuer can be a CloudFront alias on only one distribution. Other
+  # blocks serve their platform hostname behind the deployment's ingress.
+  hostnames = distinct(compact([
+    local.aws_platform_domain,
+    var.aws.serve_issuer_domain ? var.domain : null,
+  ]))
   block          = var.aws
   peer_jwks_urls = local.aws_peers
   common         = local.common

@@ -84,6 +84,27 @@ output "certificate_arn" {
   value = local.cdn_enabled ? aws_acm_certificate.sag[0].arn : null
 }
 
+output "hosted_zone_id" {
+  description = "The platform's public Route 53 zone, whether created, supplied by ID, or looked up. Null without CloudFront."
+  value       = local.platform_zone_id
+}
+
+output "hosted_zone_name_servers" {
+  description = "The nameservers to delegate a newly created platform zone to. Null when the zone is managed elsewhere."
+  value       = var.block.create_hosted_zone ? sort(aws_route53_zone.platform[0].name_servers) : null
+}
+
+output "hosted_zone_delegation" {
+  description = "The NS record to create at the parent DNS provider after creating the platform zone. This module does not write the parent zone."
+  value = var.block.create_hosted_zone ? {
+    zone_id = aws_route53_zone.platform[0].zone_id
+    name    = var.platform_domain
+    type    = "NS"
+    ttl     = 300
+    records = sort(aws_route53_zone.platform[0].name_servers)
+  } : null
+}
+
 output "unvalidated_domains" {
   description = <<-EOT
     Certificate subjects whose DNS this module was given no zone for. ACM will
@@ -135,6 +156,7 @@ output "resources" {
     waf_acl             = local.cdn_enabled && var.block.waf.create ? local.names.waf_acl : null
     cdn                 = local.cdn_enabled
     certificate_domains = local.cdn_enabled ? var.hostnames : []
+    hosted_zone         = var.block.create_hosted_zone ? var.platform_domain : null
     dns_records         = local.cdn_enabled ? [for type in ["A", "AAAA"] : "${var.platform_domain} ${type}"] : []
   }
 }

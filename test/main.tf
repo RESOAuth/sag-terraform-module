@@ -110,6 +110,18 @@ output "aws_block" {
   value = module.sag.aws
 }
 
+output "hosted_zone_delegation" {
+  value = module.sag.aws_hosted_zone_delegation
+}
+
+output "hosted_zone_id" {
+  value = module.sag.aws_hosted_zone_delegation == null ? null : module.sag.aws_hosted_zone_delegation.zone_id
+}
+
+output "hosted_zone_name_servers" {
+  value = module.sag.aws_hosted_zone_delegation == null ? null : module.sag.aws_hosted_zone_delegation.records
+}
+
 output "cloudflare_block" {
   value = module.sag.cloudflare
 }

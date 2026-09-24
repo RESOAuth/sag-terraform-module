@@ -21,7 +21,7 @@ variable "platform_domain" {
 
 variable "hostnames" {
   type        = list(string)
-  description = "Every hostname this block's certificate and CDN serve: platform_domain first, then the central domain when that differs."
+  description = "Every hostname this block's certificate and CDN serve: platform_domain first, then the central domain when serve_issuer_domain is true and that differs."
 }
 
 variable "peer_jwks_urls" {
@@ -40,6 +40,8 @@ variable "block" {
     cdn                   = optional(string, "cloudfront")
     hosted_zone_id        = optional(string)
     hosted_zone_name      = optional(string)
+    create_hosted_zone    = optional(bool, false)
+    serve_issuer_domain   = optional(bool, true)
     memory_mb             = optional(number, 512)
     timeout_seconds       = optional(number, 15)
     log_retention_days    = optional(number, 30)
@@ -64,6 +66,19 @@ variable "block" {
     peer_jwks_urls = optional(list(string), [])
     extra_vars     = optional(map(string), {})
   })
+
+  validation {
+    condition = !var.block.create_hosted_zone || (
+      var.block.hosted_zone_id == null && var.block.hosted_zone_name == null
+    )
+    error_message = "create_hosted_zone cannot be combined with hosted_zone_id or hosted_zone_name."
+  }
+  validation {
+    condition = !var.block.create_hosted_zone || (
+      var.block.platform_domain != null && var.block.cdn == "cloudfront"
+    )
+    error_message = "create_hosted_zone requires an explicit platform_domain and cdn = \"cloudfront\"."
+  }
 }
 
 variable "common" {

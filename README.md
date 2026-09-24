@@ -150,6 +150,73 @@ that is a traffic-management decision (a Route 53 failover record, a
 Cloudflare Load Balancer) and not one to automate generically. Point its
 health check at `/healthz`, never `/alive`.
 
+AWS includes the central issuer in its CloudFront aliases and ACM certificate
+by default. A CloudFront alias can belong to only one distribution, including
+across AWS accounts. Set `aws.serve_issuer_domain = false` on blocks reached
+through a separate central ingress: their certificate and distribution then
+serve only `aws.platform_domain`, while `SAG_ISSUER` stays the central domain.
+The ingress must use the selected platform hostname for the origin's Host
+header and TLS name. DNS failover alone does not perform that rewrite.
+
+## Delegating a new AWS platform zone
+
+An AWS block normally uses `hosted_zone_id`, or looks up an existing public
+zone by `hosted_zone_name` (defaulting to its platform hostname). Set
+`create_hosted_zone = true` to create the platform zone instead:
+
+```hcl
+aws = {
+  region              = "eu-west-2"
+  platform_domain     = "aws-eu-west-2.id.example.com"
+  create_hosted_zone  = true
+  serve_issuer_domain = false
+  require_secrets     = false
+}
+```
+
+Creation requires an explicit `platform_domain` and `cdn = "cloudfront"`
+(the default), and cannot be combined with `hosted_zone_id` or
+`hosted_zone_name`. The module puts ACM validation and the platform's A/AAAA
+aliases in the new zone. It leaves the parent DNS provider unchanged.
+
+A new zone must be delegated before ACM can validate its certificate. First
+review and apply a plan targeting only the zone, using the same remote backend
+and deployment pipeline as the eventual full apply:
+
+```sh
+terraform plan -target='module.sag.module.aws[0].aws_route53_zone.platform[0]' \
+  -out=zone.tfplan
+terraform apply zone.tfplan
+```
+
+This address assumes the root calls the composed module `sag`. The targeted
+apply is for this initial delegation step only; return to an ordinary full
+plan after delegation.
+
+The composed output `aws_hosted_zone_delegation` reports the new zone ID and
+the NS record to create in its parent, including all four assigned
+nameservers. Expose it directly from the root configuration:
+
+```hcl
+output "hosted_zone_delegation" {
+  value = module.sag.aws_hosted_zone_delegation
+}
+```
+
+Create that NS record in Cloudflare or whichever provider hosts the parent,
+wait for public DNS to resolve through the delegation, then run the full
+plan/apply. A full apply before delegation waits for ACM and eventually times
+out. Use the dedicated output during bootstrap: the aggregate `module.sag.aws`
+output depends on application resources outside the zone-only target and is
+not available yet.
+
+After a full apply, the AWS outputs `hosted_zone_id`,
+`hosted_zone_name_servers`, and `hosted_zone_delegation` are also available
+through `module.sag.aws`. For an existing zone, `hosted_zone_id` reports the
+selected zone and the two delegation outputs are null.
+`resources.hosted_zone` names only a zone this module creates, so plans
+distinguish zone creation from existing-zone use.
+
 ## One pipeline per platform
 
 Each block is a separate deployment, and in Terraform that means **one root

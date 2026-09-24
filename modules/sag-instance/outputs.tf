@@ -51,6 +51,13 @@ output "aws" {
   value       = length(module.aws) == 0 ? null : module.aws[0]
 }
 
+output "aws_hosted_zone_delegation" {
+  description = "A newly created AWS platform zone and its parent NS record. Available after the zone-only bootstrap; null when no zone is created."
+  # The aggregate aws output depends on application resources outside a
+  # zone-only target, so bootstrap must expose this dependency separately.
+  value = var.aws == null ? null : module.aws[0].hosted_zone_delegation
+}
+
 output "cloudflare" {
   description = "The Cloudflare block's own outputs, or null when this configuration deploys no Cloudflare block."
   value       = length(module.cloudflare) == 0 ? null : module.cloudflare[0]

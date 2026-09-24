@@ -247,21 +247,29 @@ variable "aws" {
     yet. Turn it off for the first apply of a brand-new instance - the
     per-instance KMS key that `sag-secrets` writes under does not exist
     until something has been applied - then turn it back on.
+
+    `create_hosted_zone` creates a public Route 53 zone for an explicit
+    `platform_domain`, ready to delegate from its parent DNS provider.
+    `serve_issuer_domain` includes the central issuer in the CloudFront aliases
+    and certificate by default. Turn it off when another ingress serves the
+    issuer and forwards to this block's platform hostname.
   EOT
   type = object({
-    platform_domain    = optional(string)
-    region             = string
-    state_store        = optional(string, "none")
-    clients_store      = optional(string, "none")
-    cdn                = optional(string, "cloudfront")
-    hosted_zone_id     = optional(string)
-    hosted_zone_name   = optional(string)
-    memory_mb          = optional(number, 512)
-    timeout_seconds    = optional(number, 15)
-    log_retention_days = optional(number, 30)
-    runtime            = optional(string, "nodejs22.x")
-    architecture       = optional(string, "arm64")
-    require_secrets    = optional(bool, true)
+    platform_domain     = optional(string)
+    region              = string
+    state_store         = optional(string, "none")
+    clients_store       = optional(string, "none")
+    cdn                 = optional(string, "cloudfront")
+    hosted_zone_id      = optional(string)
+    hosted_zone_name    = optional(string)
+    create_hosted_zone  = optional(bool, false)
+    serve_issuer_domain = optional(bool, true)
+    memory_mb           = optional(number, 512)
+    timeout_seconds     = optional(number, 15)
+    log_retention_days  = optional(number, 30)
+    runtime             = optional(string, "nodejs22.x")
+    architecture        = optional(string, "arm64")
+    require_secrets     = optional(bool, true)
     waf = optional(object({
       create     = optional(bool, false)
       rate_limit = optional(number, 300)
@@ -301,6 +309,18 @@ variable "aws" {
   validation {
     condition     = var.aws == null || contains(["cloudfront", "none"], var.aws.cdn)
     error_message = "aws.cdn must be \"cloudfront\" or \"none\"."
+  }
+  validation {
+    condition = var.aws == null ? true : !var.aws.create_hosted_zone || (
+      var.aws.hosted_zone_id == null && var.aws.hosted_zone_name == null
+    )
+    error_message = "aws.create_hosted_zone cannot be combined with hosted_zone_id or hosted_zone_name."
+  }
+  validation {
+    condition = var.aws == null ? true : !var.aws.create_hosted_zone || (
+      var.aws.platform_domain != null && var.aws.cdn == "cloudfront"
+    )
+    error_message = "aws.create_hosted_zone requires an explicit platform_domain and cdn = \"cloudfront\"."
   }
   validation {
     condition     = var.aws == null || contains(["arm64", "x86_64"], var.aws.architecture)
